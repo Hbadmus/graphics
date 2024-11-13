@@ -310,7 +310,13 @@ std::vector<Triangle> generatePlane(size_t resolution = 1) {
             float ny = 1.0f;
             float nz = 0.0f;
 
-            vertices.push_back({x, y, z, r, g, b, nx, ny, nz});
+            // Create vertex using constructor
+            vertices.push_back(Vertex(
+                x, y, z,          // position
+                r, g, b,          // color
+                nx, ny, nz,       // normal
+                j/(float)resolution, i/(float)resolution  // texture coordinates
+            ));
         }
     }
 
@@ -840,17 +846,13 @@ void CleanUp(){
 * @return program status
 */
 int main(int argc, char* args[]) {
+    // Check command line arguments
     if (argc < 2) {
         std::cout << "Usage: " << args[0] << " <path_to_obj_file>\n";
         return 1;
     }
 
-    std::string objFile = args[1];
-    if (!gMesh.LoadOBJ(objFile)) {
-        std::cout << "Failed to load OBJ file: " << objFile << "\n";
-        return 1;
-    }
-
+    // Print usage instructions
     std::cout << "Use w and s keys to move forward and back\n";
     std::cout << "Use a and d keys to move left and right\n";
     std::cout << "Use up and down to change tessellation\n";
@@ -858,20 +860,34 @@ int main(int argc, char* args[]) {
     std::cout << "Press 'n' to toggle shading mode (Normals/Phong)\n";
     std::cout << "Press ESC to quit\n";
 
-    // 1. Setup the graphics program
+    // 1. Initialize SDL and OpenGL context
     InitializeProgram();
 
-    // 2. Setup our geometry
-    VertexSpecification();
-
-    // 3. Create our graphics pipeline
-    //  - At a minimum, this means the vertex and fragment shader
+    // 2. Create and compile shaders
     CreateGraphicsPipeline();
 
-    // 4. Call the main application loop
+    // 3. Load the 3D model without textures
+    std::string objFile = args[1];
+    if (!gMesh.LoadOBJ(objFile)) {
+        std::cout << "Failed to load OBJ file: " << objFile << "\n";
+        return 1;
+    }
+
+    // 4. Now that OpenGL is initialized, load textures
+    if (!gMesh.LoadTextures()) {
+        std::cout << "Warning: Failed to load textures, continuing without textures\n";
+    }
+
+    // 5. Set up vertex buffers and attributes
+    VertexSpecification();
+
+    // 6. Generate any additional geometry (like the floor)
+    GeneratePlaneBufferData();
+
+    // 7. Enter the main application loop
     MainLoop();
 
-    // 5. Call the cleanup function when our program terminates
+    // 8. Clean up resources when the program ends
     CleanUp();
 
     return 0;

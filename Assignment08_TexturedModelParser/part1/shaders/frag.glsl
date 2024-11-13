@@ -6,6 +6,7 @@ in vec3 v_normal;
 in vec3 v_fragPos;
 in vec3 v_color;
 
+
 // Uniforms
 uniform sampler2D u_texture;        // Added texture sampler
 uniform vec3 u_lightPos;
@@ -54,6 +55,6 @@ void main()
     vec3 specular = u_materialSpecular * spec * u_lightColor;
 
     // Combine lighting with texture color
-    vec3 result = (ambient + diffuse + specular) * textureColor;
+    vec3 result = textureColor;
     FragColor = vec4(result, 1.0);
 }

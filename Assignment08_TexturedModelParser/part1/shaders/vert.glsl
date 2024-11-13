@@ -25,10 +25,12 @@ void main()
 
     // Transform normal to world space
     // Note: Using the normal matrix (transpose(inverse(model))) to handle non-uniform scaling
-    v_normal = mat3(transpose(inverse(u_ModelMatrix))) * normal;
+    v_normal = normalize(mat3(transpose(inverse(u_ModelMatrix))) * normal);
 
-    // Pass through color and texture coordinates
+    // Pass through color
     v_color = color;
+
+    // Pass through texture coordinates - ensure they're properly oriented
     v_texCoord = texCoord;
 
     // Final position

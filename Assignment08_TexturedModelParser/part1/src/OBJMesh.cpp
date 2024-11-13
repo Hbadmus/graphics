@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include "TextureLoader.hpp"
+#include <tuple>
 
 OBJMesh::OBJMesh() : m_textureID(0) {}
 
@@ -60,40 +60,41 @@ bool OBJMesh::LoadOBJ(const std::string& filename) {
             normals.push_back(glm::normalize(glm::vec3(nx, ny, nz)));
             normalCount++;
         }
-        else if (type == "vt") {
-            float s, t;
-            iss >> s >> t;
-            texCoords.push_back(glm::vec2(s, 1.0f - t)); // Flip t coordinate
-            normalCount++;
-        }
+else if (type == "vt") {
+    float s, t;
+    iss >> s >> t;
+    texCoords.push_back(glm::vec2(s, t));
+}
         else if (type == "f") {
             std::string vertex1, vertex2, vertex3;
             iss >> vertex1 >> vertex2 >> vertex3;
 
-            auto [v1, vn1] = ParseVertexIndices(vertex1);
-            auto [v2, vn2] = ParseVertexIndices(vertex2);
-            auto [v3, vn3] = ParseVertexIndices(vertex3);
+            auto [v1, vt1, vn1] = ParseVertexIndices(vertex1);
+            auto [v2, vt2, vn2] = ParseVertexIndices(vertex2);
+            auto [v3, vt3, vn3] = ParseVertexIndices(vertex3);
 
             Triangle tri;
-            // Convert to vertex format
-            tri.vertices[0] = {
-                positions[v1].x, positions[v1].y, positions[v1].z,
-                0.7f, 0.7f, 0.7f,  // Default color
-                normals[vn1].x, normals[vn1].y, normals[vn1].z,
-                texCoords[v1].x, texCoords[v1].y
-            };
-            tri.vertices[1] = {
-                positions[v2].x, positions[v2].y, positions[v2].z,
-                0.7f, 0.7f, 0.7f,
-                normals[vn2].x, normals[vn2].y, normals[vn2].z,
-                texCoords[v2].x, texCoords[v2].y
-            };
-            tri.vertices[2] = {
-                positions[v3].x, positions[v3].y, positions[v3].z,
-                0.7f, 0.7f, 0.7f,
-                normals[vn3].x, normals[vn3].y, normals[vn3].z,
-                texCoords[v3].x, texCoords[v3].y
-            };
+            // Convert to vertex format using Vertex constructor
+            tri.vertices[0] = Vertex(
+                positions[v1].x, positions[v1].y, positions[v1].z,     // position
+                0.7f, 0.7f, 0.7f,                                     // color
+                normals[vn1].x, normals[vn1].y, normals[vn1].z,       // normal
+                texCoords[vt1].x, texCoords[vt1].y                    // texture coordinates
+            );
+
+            tri.vertices[1] = Vertex(
+                positions[v2].x, positions[v2].y, positions[v2].z,     // position
+                0.7f, 0.7f, 0.7f,                                     // color
+                normals[vn2].x, normals[vn2].y, normals[vn2].z,       // normal
+                texCoords[vt2].x, texCoords[vt2].y                    // texture coordinates
+            );
+
+            tri.vertices[2] = Vertex(
+                positions[v3].x, positions[v3].y, positions[v3].z,     // position
+                0.7f, 0.7f, 0.7f,                                     // color
+                normals[vn3].x, normals[vn3].y, normals[vn3].z,       // normal
+                texCoords[vt3].x, texCoords[vt3].y                    // texture coordinates
+            );
 
             m_triangles.push_back(tri);
             faceCount++;
@@ -108,16 +109,14 @@ bool OBJMesh::LoadOBJ(const std::string& filename) {
     return true;
 }
 
-std::pair<int, int> OBJMesh::ParseVertexIndices(const std::string& vertexStr) const {
+std::tuple<int, int, int> OBJMesh::ParseVertexIndices(const std::string& vertexStr) const {
     size_t slash1 = vertexStr.find('/');
     size_t slash2 = vertexStr.find('/', slash1 + 1);
 
     if (slash1 == std::string::npos) {
-        // Only vertex position index
-        return {std::stoi(vertexStr) - 1, 0};
+        return {std::stoi(vertexStr) - 1, 0, 0};
     }
 
-    // Extract vertex/texture/normal indices
     std::string vStr = vertexStr.substr(0, slash1);
     std::string vtStr = vertexStr.substr(slash1 + 1, slash2 - slash1 - 1);
     std::string vnStr = vertexStr.substr(slash2 + 1);
@@ -126,49 +125,24 @@ std::pair<int, int> OBJMesh::ParseVertexIndices(const std::string& vertexStr) co
     int vtIdx = vtStr.empty() ? 0 : std::stoi(vtStr) - 1;
     int vnIdx = vnStr.empty() ? 0 : std::stoi(vnStr) - 1;
 
-    return {vIdx, vnIdx};
+    // Ensure indices are valid
+    if (vtIdx >= texCoords.size()) {
+        std::cerr << "Warning: Invalid texture coordinate index: " << vtIdx << std::endl;
+        vtIdx = 0;
+    }
+
+    return {vIdx, vtIdx, vnIdx};
 }
-
-bool OBJMesh::LoadMTL(const std::string& filename) {
-    std::cout << "\nAttempting to load MTL file: " << filename << std::endl;
-
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "ERROR: Failed to open MTL file: " << filename << std::endl;
-        return false;
-    }
-    std::cout << "Successfully opened MTL file" << std::endl;
-
-    std::string line;
-    while (std::getline(file, line)) {
-        std::istringstream iss(line);
-        std::string token;
-        iss >> token;
-
-        if (token == "newmtl") {
-            iss >> m_material.name;
-            std::cout << "Found material: " << m_material.name << std::endl;
+bool OBJMesh::LoadTextures() {
+    if (!m_pendingTexturePath.empty()) {
+        m_textureID = TextureLoader::LoadPPM(m_pendingTexturePath);
+        if (m_textureID == 0) {
+            std::cerr << "ERROR: Failed to load texture: " << m_pendingTexturePath << std::endl;
+            return false;
         }
-        else if (token == "map_Kd") {
-            iss >> m_material.diffuseTexture;
-            // Get directory of MTL file
-            size_t lastSlash = filename.find_last_of("/\\");
-            std::string directory = lastSlash != std::string::npos ?
-                                  filename.substr(0, lastSlash + 1) : "";
-
-            std::string fullTexturePath = directory + m_material.diffuseTexture;
-            std::cout << "Found texture path: " << fullTexturePath << std::endl;
-
-            // Load the texture using TextureLoader
-            m_textureID = TextureLoader::LoadPPM(fullTexturePath);
-            if (m_textureID == 0) {
-                std::cerr << "ERROR: Failed to load texture: " << fullTexturePath << std::endl;
-                return false;
-            }
-            std::cout << "Successfully loaded texture. TextureID: " << m_textureID << std::endl;
-        }
+        std::cout << "Successfully loaded texture. TextureID: " << m_textureID << std::endl;
+        m_pendingTexturePath.clear();
     }
-
     return true;
 }
 
@@ -222,4 +196,40 @@ void OBJMesh::SetupBuffers(GLuint& vao, GLuint& vbo) {
 
 size_t OBJMesh::GetTriangleCount() const {
     return m_triangles.size();
+}
+
+bool OBJMesh::LoadMTL(const std::string& filename) {
+    std::cout << "\nAttempting to load MTL file: " << filename << std::endl;
+
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Failed to open MTL file: " << filename << std::endl;
+        return false;
+    }
+    std::cout << "Successfully opened MTL file" << std::endl;
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string token;
+        iss >> token;
+
+        if (token == "newmtl") {
+            iss >> m_material.name;
+            std::cout << "Found material: " << m_material.name << std::endl;
+        }
+        else if (token == "map_Kd") {
+            iss >> m_material.diffuseTexture;
+            // Get directory of MTL file
+            size_t lastSlash = filename.find_last_of("/\\");
+            std::string directory = lastSlash != std::string::npos ?
+                                  filename.substr(0, lastSlash + 1) : "";
+
+            m_pendingTexturePath = directory + m_material.diffuseTexture;
+            std::cout << "Found texture path: " << m_pendingTexturePath << std::endl;
+        }
+    }
+
+    file.close();
+    return true;
 }
