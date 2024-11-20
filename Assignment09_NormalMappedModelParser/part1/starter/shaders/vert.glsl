@@ -16,6 +16,7 @@ out vec3 TangentLightPos;
 out vec3 TangentViewPos;
 out vec3 TangentFragPos;
 
+
 // If we are applying our camera, then we need to add some uniforms.
 // Note that the syntax nicely matches glm's mat4!
 
@@ -26,11 +27,21 @@ uniform vec3 viewPos;  // Where our camera is
 
 void main()
 {
+    vec3 FragPos = vec3(modelTransformMatrix * vec4(position, 1.0));
 
-	gl_Position = projectionMatrix * modelTransformMatrix * vec4(position, 1.0f);;
+    vec3 T = normalize(vec3(modelTransformMatrix * vec4(tangents, 0.0)));
+    vec3 B = normalize(vec3(modelTransformMatrix * vec4(bitangents, 0.0)));
+    vec3 N = normalize(vec3(modelTransformMatrix * vec4(normals, 0.0)));
 
-  	// Store the texture coordinaets which we will output to
+    mat3 TBN = transpose(mat3(T, B, N));
+
+    TangentFragPos = TBN * FragPos;
+    TangentLightPos = TBN * lightPos;
+    TangentViewPos  = TBN * viewPos;
+
+    gl_Position = projectionMatrix * modelTransformMatrix * vec4(position, 1.0);
+	
+	// Store the texture coordinaets which we will output to
   	// the next stage in the graphics pipeline.
-  	v_texCoord = texCoord;
+	v_texCoord = texCoord;
 }
-// ==================================================================
