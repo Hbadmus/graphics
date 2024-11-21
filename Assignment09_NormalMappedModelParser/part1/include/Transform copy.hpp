@@ -1,6 +1,6 @@
 /** @file Transform.hpp
  *  @brief Responsible for holding matrix operations in model, view, and projection space..
- *
+ *  
  *  More...
  *
  *  @author Mike
@@ -12,7 +12,6 @@
 #include <glad/glad.h>
 #include "glm/vec3.hpp"
 #include "glm/gtc/matrix_transform.hpp"
-
 
 // The purpose of this class is to store
 // transformations of 3D entities (cameras, objects, etc.)
